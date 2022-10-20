@@ -1,18 +1,4 @@
 #!/bin/python3
-"""
-About this Class
-
-We want to execute the following actions on the SCP EMA data:
-      * Parse subject-level pings
-      * Aggregate into a master CSV
-      * Gunzip all files together
-      * Delete directory tree
-
-We'll then download the resulting files for the end user
-
-Ian Richard Ferguson | Stanford University
-"""
-
 from datetime import datetime
 import os, pathlib, json, sys, tarfile
 import shutil
@@ -26,14 +12,23 @@ from time import sleep
 
 
 class EMA_Parser:
+      """
+      We want to execute the following actions on the SCP EMA data:
+            * Parse subject-level pings
+            * Aggregate into a master CSV
+            * Gunzip all files together
+            * Delete directory tree
 
-      def __init__(self, filename: str, output_path: os.path=None):
+      We'll then download the resulting files for the end user    
+      """
+
+      def __init__(self, path_to_file: os.path, output_path: os.path=None):
 
             self.root = pathlib.Path(__file__).parents[0]
 
             ###
 
-            self.filename = filename
+            self.filename = path_to_file.split("/")[-1]
 
             if output_path is None:
                   self.output_path = os.path.join(
@@ -64,9 +59,9 @@ class EMA_Parser:
             return output
 
 
-      def sanity_check(self):
+      def generate_duplicate_responses(self):
             """
-            
+            Creates a JSON file of subjects with duplicate responses
             """
 
             # Read in subject data JSON as dictionary
@@ -113,8 +108,9 @@ class EMA_Parser:
       
       def derive_pings(self, SUBSET: dict, KEY: str) -> pd.DataFrame:
             """
-            SUBSET => Reduced dictionary containing 
-            KEY => Key from the master JSON
+            * SUBSET: Reduced dictionary containing 
+            * KEY: Key from the master JSON
+            
             This function isolates ping data from the participant's dictionary
             Returns wide DataFrame object with select columns
             """
@@ -127,7 +123,6 @@ class EMA_Parser:
             
             login_node = KEY.split('-')[1:]
             login_node = "".join(login_node)
-
             pings['login-node'] = login_node
 
             return pings.loc[:, ['username', 'login-node', 'streamName', 'startTime', 
@@ -139,9 +134,10 @@ class EMA_Parser:
 
       def derive_answers(self, SUBSET: dict, LOG, USER: str) -> pd.DataFrame:
             """
-            SUBSET => Reduced dictionary of subject information (pings/user/answers)
-            LOG => Text file to log issues
-            USER => Username, used in error log
+            * SUBSET: Reduced dictionary of subject information (pings/user/answers)
+            * LOG: Text file to log issues
+            * USER: Username, used in error log
+            
             This function isolates participant respones and converts from long to wide
             Returns DataFrame object
             """
@@ -205,7 +201,8 @@ class EMA_Parser:
 
       def cleanup_values(self, x) -> str:
             """
-            x => Isolated value derived from lambda
+            * x: Isolated value derived from lambda
+
             This function is applied via lambda, serialized per column
             """
 
@@ -336,8 +333,8 @@ class EMA_Parser:
 
       def parse_race(self, DF: pd.DataFrame):
             """
-            Un-nests race responses
-            Returns list of all responses marked True (may be more than one)
+            * Un-nests race responses
+            * Returns list of all responses marked True (may be more than one)
             """
 
             def isolate_race_value(x):
@@ -407,11 +404,13 @@ class EMA_Parser:
 
       def parse_device_info(self, SUBSET: dict, KEY: str):
             """
-            SUBSET => Particpant's reduced JSON file (as Python dictionary)
-            KEY => Key from the JSON data dictionary
+            * SUBSET: Particpant's reduced JSON file (as Python dictionary)
+            * KEY: Key from the JSON data dictionary
+            
             This function flattens user device info into a single-row
             DataFrame object. This is returned and stacked with others
             in the main function
+            
             Returns DataFrame object
             """
 
@@ -562,7 +561,7 @@ class EMA_Parser:
             subject_output_directory = self.subject_output
             aggregate_output_directory = self.aggregate_output
 
-            self.sanity_check(sub_data, aggregate_output_directory)
+            self.generate_duplicate_responses(sub_data, aggregate_output_directory)
 
             #####
 
