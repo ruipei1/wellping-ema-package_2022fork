@@ -7,7 +7,7 @@ HERE = pathlib.Path(__file__).parent
 README = (HERE / "README.md").read_text()
 
 setup(name='wellping_ema_parser',
-      version='1.0.0',
+      version='1.0.1',
       description='JSON to CSV converter for Stanford Communities Project',
       long_description=README,
       long_description_content_type="text/markdown",
