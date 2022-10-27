@@ -22,16 +22,16 @@ class EMA_Parser:
       We'll then download the resulting files for the end user    
       """
 
-      def __init__(self, path_to_file: os.path, output_path: os.path=None):
+      def __init__(self, path_to_file: os.path):
 
-            self.root = pathlib.Path(__file__).parents[0]
+            self.root = pathlib.Path(path_to_file).parents[0]
+            self.filepath = path_to_file
 
             ###
 
             self.filename = path_to_file.split("/")[-1]
 
-            if output_path is None:
-                  self.output_path = os.path.join(
+            self.output_path = os.path.join(
                         self.root, 
                         "OUTPUT")
 
@@ -65,7 +65,7 @@ class EMA_Parser:
             """
 
             # Read in subject data JSON as dictionary
-            with open(os.path.join(self.output_path, self.filename)) as incoming:
+            with open(self.filepath) as incoming:
                   data = json.load(incoming)
 
             # List of keys from JSON
@@ -77,7 +77,7 @@ class EMA_Parser:
             # Empty dictionary to append into
             output_dict = {}                                                        
 
-            print("\nIdentifying duplicate subject responses...\n")
+            print("Identifying duplicate subject responses...")
 
             #####
 
@@ -91,7 +91,7 @@ class EMA_Parser:
                         output_dict[sub]['count'] = len(instances)
                         output_dict[sub]['keys'] = instances
 
-            print("\nSaving response-duplicates JSON file...\n")
+            print("Saving response-duplicates JSON file...")
 
             #####
 
@@ -553,7 +553,10 @@ class EMA_Parser:
 
       def run_parser(self):
             """
-            
+            Wraps all parsing helper functions
+
+            * Parses device and response data
+            * Aggregates response data in a single CSV
             """
 
             target_path = self.output_path
@@ -563,13 +566,13 @@ class EMA_Parser:
             subject_output_directory = self.subject_output
             aggregate_output_directory = self.aggregate_output
 
-            self.generate_duplicate_responses(sub_data, aggregate_output_directory)
+            self.generate_duplicate_responses()
 
             #####
 
-            with open(os.path.join(self.output_path, self.filename)) as incoming:
+            with open(self.filepath) as incoming:
 
-                  print(f"\n\nParsing {os.path.join(self.output_path, self.filename)}\n\n")
+                  print(f"\nParsing {self.filepath}")
 
                   #####
 
@@ -584,7 +587,7 @@ class EMA_Parser:
                         # Empty dictionary to append sparse data into
                         parent_errors = {}
 
-                        print("\nParsing participant data...\n")
+                        print("\nParsing participant data...")
                         sleep(1)
 
                         # Key == Subject and login ID (we'll separate these later)
@@ -616,7 +619,7 @@ class EMA_Parser:
                               keepers.append(parsed_data)
 
                         sleep(1)
-                        print("\nAggregating participant data...\n")
+                        print("Aggregating participant data...")
 
                         try:
                               # Stack all DFs into one
@@ -629,16 +632,16 @@ class EMA_Parser:
                         except Exception as e:
                               # Something has gone wrong here and you have no participant data ... check the log
                               print(f"{e}")
-                              print("\nNo objects to concatenate...\n")
+                              print("No objects to concatenate...")
                               sys.exit(1)
 
-                        print("\nSaving parent errors...\n")
+                        print("Saving parent errors...")
 
                         # Push parent errors (no pings) to local JSON
                         with open(f'{self.aggregate_output}/parent-errors.json', 'w') as outgoing:
                               json.dump(parent_errors, outgoing, indent=4)
 
-                        print("\nParsing device information...\n")
+                        print("\nParsing device information...")
 
                         # I/O new text file for device parsing errors
                         with open(f"{self.aggregate_output}/device-error-log.txt", 'w') as log:
@@ -672,7 +675,7 @@ class EMA_Parser:
 
       def gunzip(self):
             """
-            
+            Helper function to create gunzipped directory
             """
 
             filename = datetime.now().strftime("%b_%d_%Y")
@@ -687,5 +690,14 @@ class EMA_Parser:
 
 
       def run_and_gun(self):
+            """
+            Wrapper to run and compress output
+            in one function
+            """
+
+            print("\n== Parsing ==")
             self.run_parser()
+            sleep(2)
+
+            print("== Zipping ==")
             self.gunzip()
