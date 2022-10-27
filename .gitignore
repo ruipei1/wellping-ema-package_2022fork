@@ -1,3 +1,6 @@
 build/
 dist/
+test/
 wellping_ema_parser.egg-info/
+
+*pyc
