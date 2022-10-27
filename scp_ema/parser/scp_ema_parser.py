@@ -50,7 +50,7 @@ class EMA_Parser:
 
             output = []
 
-            for subdir in ["Subjects", f"SCP-EMA_Output"]:
+            for subdir in ["Subjects", "SCP-EMA_Output"]:
 
                   temp = os.path.join(self.output_path, subdir)
                   pathlib.Path(temp).mkdir(exist_ok=True, parents=True)
@@ -125,8 +125,10 @@ class EMA_Parser:
             login_node = "".join(login_node)
             pings['login-node'] = login_node
 
-            return pings.loc[:, ['username', 'login-node', 'streamName', 'startTime', 
-                                    'notificationTime', 'endTime', 'id', 'tzOffset']]
+            keeper_variables = ['username', 'login-node', 'streamName', 'startTime',
+                                'notificationTime', 'endTime', 'id', 'tzOffset']
+
+            return pings.loc[:, keeper_variables]
 
 
       #####
@@ -451,15 +453,14 @@ class EMA_Parser:
       #####
 
 
-      def parse_responses(self, KEY, SUBSET, LOG, OUTPUT_DIR, KICKOUT):
+      def parse_responses(self, KEY: str, SUBSET: dict, LOG, 
+                          OUTPUT_DIR: os.path, KICKOUT: bool) -> pd.DataFrame:
             """
-            KEY => Key from the master data dictionary
-            SUBSET => Reduced dictionary of participant-only data
-            LOG => Text file to store errors and exceptions
-            OUTPUT_DIR => Relative path to output directory
-            KICKOUT => Boolean, if True a local CSV is saved
-            This function wraps everything defined above
-            Returns a clean DataFrame object
+            * KEY: Key from the master data dictionary
+            * SUBSET: Reduced dictionary of participant-only data
+            * LOG: Text file to store errors and exceptions
+            * OUTPUT_DIR: Relative path to output directory
+            * KICKOUT: Boolean, if True a local CSV is saved
             """
 
             # Isolate username
@@ -516,15 +517,16 @@ class EMA_Parser:
 
 
 
-      def output(self, KEY, PINGS, ANSWERS, OUTPUT_DIR, KICKOUT):
+      def output(self, KEY: str, PINGS: pd.DataFrame, 
+                ANSWERS: pd.DataFrame, OUTPUT_DIR: os.path, KICKOUT: bool):
             """
-            KEY => Key from JSON file
-            PINGS => Pandas DataFrame object
-            ANSWERS => Pandas DataFrame object
-            OUTPUT_DIR => Relative path to aggregates directory
-            KICKOUT => Boolean, determiens if CSV will be saved
             Merges pings and answers dataframes
-            Returns DataFrame object
+
+            * KEY: Key from JSON file
+            * PINGS: Pandas DataFrame object
+            * ANSWERS: Pandas DataFrame object
+            * OUTPUT_DIR: Relative path to aggregates directory
+            * KICKOUT: Boolean, determiens if CSV will be saved
             """
 
             # Isolate username
@@ -668,18 +670,22 @@ class EMA_Parser:
                               print("\nAll responses + devices parsed\n")
 
 
-      def _gunzip(self):
+      def gunzip(self):
             """
             
             """
 
             filename = datetime.now().strftime("%b_%d_%Y")
+            tarfile_name = f"{self.output_path}/SCP_EMA_Responses.tar.gz"
 
-            with tarfile.open(f"{self.output_path}/SCP_EMA_Responses.tar.gz", "w:gz") as tar:
-                  tar.add(self.aggregate_output, arcname=f"SCP_EMA_Responses_{filename}")
+            with tarfile.open(tarfile_name, "w:gz") as tar:
+                  tar.add(
+                        self.aggregate_output, 
+                        arcname=f"SCP_EMA_Responses_{filename}"
+                  )
 
 
 
       def run_and_gun(self):
-            self.run_this_puppy()
-            self._gunzip_output()
+            self.run_parser()
+            self.gunzip()
