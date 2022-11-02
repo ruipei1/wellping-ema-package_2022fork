@@ -19,7 +19,7 @@ class EMA_Parser:
             * Gunzip all files together
             * Delete directory tree
 
-      We'll then download the resulting files for the end user    
+      We'll then download the resulting files for the end user
       """
 
       def __init__(self, path_to_file: os.path):
@@ -32,7 +32,7 @@ class EMA_Parser:
             self.filename = path_to_file.split("/")[-1]
 
             self.output_path = os.path.join(
-                        self.root, 
+                        self.root,
                         "OUTPUT")
 
             ###
@@ -69,13 +69,13 @@ class EMA_Parser:
                   data = json.load(incoming)
 
             # List of keys from JSON
-            keys = list(data.keys())                                                
+            keys = list(data.keys())
 
             # Unique subject IDs
-            sub_ids = set([x.split('-')[0] for x in keys])                          
+            sub_ids = set([x.split('-')[0] for x in keys])
 
             # Empty dictionary to append into
-            output_dict = {}                                                        
+            output_dict = {}
 
             print("Identifying duplicate subject responses...")
 
@@ -83,10 +83,10 @@ class EMA_Parser:
 
             for sub in tqdm(sub_ids):
                   # Number of responses from single sub
-                  instances = [x for x in keys if sub in x]                         
+                  instances = [x for x in keys if sub in x]
 
                   # Add to output dict if multiples exist
-                  if len(instances) > 1:                                            
+                  if len(instances) > 1:
                         output_dict[sub] = {}
                         output_dict[sub]['count'] = len(instances)
                         output_dict[sub]['keys'] = instances
@@ -98,29 +98,29 @@ class EMA_Parser:
             # Push to local JSON file
             with open(os.path.join(self.aggregate_output, "response-duplicates.json"), "w") as outgoing:
                   json.dump(
-                        output_dict, 
-                        outgoing, 
+                        output_dict,
+                        outgoing,
                         indent=4)
 
 
       #####
 
-      
+
       def derive_pings(self, SUBSET: dict, KEY: str) -> pd.DataFrame:
             """
-            * SUBSET: Reduced dictionary containing 
+            * SUBSET: Reduced dictionary containing
             * KEY: Key from the master JSON
-            
+
             This function isolates ping data from the participant's dictionary
             Returns wide DataFrame object with select columns
             """
 
             # JSON -> DataFrame
-            pings = pd.DataFrame(SUBSET['pings'])                                   
-            
+            pings = pd.DataFrame(SUBSET['pings'])
+
             # Add username column
-            pings['username'] = KEY.split('-')[0]                                   
-            
+            pings['username'] = KEY.split('-')[0]
+
             login_node = KEY.split('-')[1:]
             login_node = "".join(login_node)
             pings['login-node'] = login_node
@@ -139,7 +139,7 @@ class EMA_Parser:
             * SUBSET: Reduced dictionary of subject information (pings/user/answers)
             * LOG: Text file to log issues
             * USER: Username, used in error log
-            
+
             This function isolates participant respones and converts from long to wide
             Returns DataFrame object
             """
@@ -240,7 +240,7 @@ class EMA_Parser:
       def parse_nominations(self, DF: pd.DataFrame):
             """
             This function is named nominations ... e.g., Dean Baltiansky
-            
+
             The following columns are parsed...
                   * SU_Nom => 1,2,3
                   * SU_Nom_None_Nom => 1,2,3
@@ -252,81 +252,96 @@ class EMA_Parser:
             voi = {
                   'SU_Nom': 'SU_Nom_{}',
                   'SU_Nom_None_Nom': 'SU_Nom_None_Nom_{}',
+                  'SU_Nom_None_Digital_Nom':'SU_Nom_None_Digital_Nom_{}',
+                  'SU_Digital_Nom':'SU_Digital_Nom_{}',
+                  'SU_Digital_Nom_None_In_Person': 'SU_Digital_Nom_None_In_Person_{}',
+                  'SU_Nom_None_Digital_Nom_None_In_Person':'SU_Nom_None_Digital_Nom_None_In_Person_{}',
                   'NSU_Rel': 'NSU{}_Rel',
                   'NSU_Nom_None_Nom': 'NSU{}_None_Rel'
             }
 
             #####
 
-            for parent in list(voi.keys()):                                      
+            for parent in list(voi.keys()):
 
+                  try:
                   # Not every participant has every variable ... this will standardize it
-                  if parent not in list(DF.columns):
-                        DF[parent] = [] * len(DF)
-                        continue
+                      if parent not in list(DF.columns):
+                            DF[parent] = [] * len(DF)
+                            continue
+
+                      #####
+
+                      for k in [1, 2, 3, 4, 5, 6]:
+                            # E.g., SU_Nom_1
+                            new_var = voi[parent].format(k)
+
+                            # Create empty column
+                            DF[new_var] = [''] * len(DF)
+
 
                   #####
 
-                  for k in [1, 2, 3]: 
-                        # E.g., SU_Nom_1                                                
-                        new_var = voi[parent].format(k)                                
-                        
-                        # Create empty column
-                        DF[new_var] = [''] * len(DF)     
+                      for ix, value in enumerate(DF[parent]):
 
-                  #####                              
+                            try:
+                                # If value is null we'll skip over it
+                                  check_nan = np.isnan(value)
+                                  continue
 
-                  for ix, value in enumerate(DF[parent]):                       
-                        try:
-                            # If value is null we'll skip over it
-                              check_nan = np.isnan(value)                                 
-                              continue
-                        
-                        except:
-                            # Skip over "None" and "PNA" values
-                              if str(value) == "None":                                    
-                                    continue
-                              elif value == "PNA":
-                                    continue
+                            except:
+                                # Skip over "None" and "PNA" values
+                                  if str(value) == "None":
+                                        continue
+                                  elif value == "PNA":
+                                        continue
 
-                        ###
+                            ###
 
-                        # Replace double-quotes, split on comma b/w nominees
-                        value = value.replace("\"", "\'").split("\',")                  
+                            # Replace double-quotes, split on comma b/w nominees
+                            value = value.replace("\"", "\'").split("\',")
 
-                        ###
+                            ###
 
-                        for k in range(len(value)):                                     
-                              new_var = voi[parent].format(k+1)
+                            for k in range(len(value)):
+                                  new_var = voi[parent].format(k+1)
+                                  try:
+                                        # Isolate nominee by list position
+                                        new_val = value[k]
 
-                        try:              
-                              # Isolate nominee by list position
-                              new_val = value[k]                                      
-                        
-                        except IndexError:
-                              # Skip over index error
-                              continue                                                
+                                  except IndexError:
+                                        # Skip over index error
+                                        continue
 
-                        ###
+                            ###
 
-                        for char in ["[", "]"]:
+                                  for char in ["[", "]"]:
 
-                              # Strip out square brackets
-                              new_val = new_val.replace(char, "")                     
+                                        # Strip out square brackets
+                                        new_val = new_val.replace(char, "")
 
-                        # Remove leading / trailing space
-                        new_val = new_val.strip()                                   
+                                  # Remove leading / trailing space
+                                  new_val = new_val.strip()
 
-                        # Push isolated nominee to DF
-                        DF.loc[ix, new_var] = new_val                               
+                                  # Push isolated nominee to DF
+                                  #if parent == "SU_Nom_None_Digital_Nom":
+                                  #      print(parent)
+                                  #      print(new_val)
+                                  #      print(new_var)
+                                  DF.loc[ix, new_var] = new_val
 
-            #####
+
+                #####
+                  except BaseException as exception:
+                    print("Ignored exception: " + type(exception).__name__)
+                    continue
+
 
             for parent in list(voi.keys()):
-                  for k in [1,2,3]:
+                  for k in [1,2,3,4,5,6]:
                         new_var = voi[parent].format(k)
 
-                        # Run cleanup_values function again to strip out 
+                        # Run cleanup_values function again to strip out
                         # leading / trailing characters (for roster matching)
                         DF[new_var] = DF[new_var].apply(lambda x: self.cleanup_values(x))
 
@@ -337,6 +352,7 @@ class EMA_Parser:
             """
             * Un-nests race responses
             * Returns list of all responses marked True (may be more than one)
+            * RP update (10/28/2022): make the function parse other variables as well
             """
 
             def isolate_race_value(x):
@@ -366,16 +382,43 @@ class EMA_Parser:
 
             #####
 
-            try:
-                  # Make sure Race column is present
-                  check = list(DF['Race'])
+            vars_to_update = ['Race', 'socialRiskTaking', 'socMediaPlatforms']
 
-                  # Apply isolate_race_value helper function
-                  DF['Race'] = DF['Race'].apply(lambda x: isolate_race_value(x))
+            for var_name in vars_to_update:
 
-            except:
-                  # If key doesn't exist, create empty column
-                  DF['Race'] = [] * len(DF)
+                  try:
+                        # Make sure Race column is present
+                        check = list(DF[var_name])
+
+                        # Apply isolate_race_value helper function
+                        DF[var_name] = DF[var_name].apply(lambda x: isolate_race_value(x))
+
+                  except:
+                        # If key doesn't exist, create empty column
+                        DF[var_name] = [] * len(DF)
+
+            return DF
+
+      def remove_brackets(self, DF: pd.DataFrame): 
+            """
+            * Removes brackets from variable
+            * RP update (10/28/2022): make the function parse other variables as well
+            """
+
+            vars_to_update = ['SU_Most_Meaningful','ladderUS']
+
+            for var_name in vars_to_update:
+
+                  try:
+                        # Make sure column is present
+                        check = list(DF[var_name])
+
+                        # remove bracket
+                        DF[var_name] = DF[var_name].str.replace(r'[][]', '', regex=True)
+
+                  except:
+                        # If key doesn't exist, create empty column
+                        DF[var_name] = [] * len(DF)
 
             return DF
 
@@ -408,44 +451,44 @@ class EMA_Parser:
             """
             * SUBSET: Particpant's reduced JSON file (as Python dictionary)
             * KEY: Key from the JSON data dictionary
-            
+
             This function flattens user device info into a single-row
             DataFrame object. This is returned and stacked with others
             in the main function
-            
+
             Returns DataFrame object
             """
 
             # Isolate device information from JSON
-            devices = SUBSET['user']                                            
-            
-            # Pull in username from data dictionary
-            username = devices['username']                                     
-            
-            # Isolate subject login time from data key
-            login_time = KEY.split('-')[-1]     
+            devices = SUBSET['user']
 
-            #####                                
+            # Pull in username from data dictionary
+            username = devices['username']
+
+            # Isolate subject login time from data key
+            login_time = KEY.split('-')[-1]
+
+            #####
 
             # Parent DF to merge into
-            master = pd.DataFrame({'username':username}, index=[0])            
+            master = pd.DataFrame({'username':username}, index=[0])
 
             for key in ['device', 'app']:
 
                   # Isloate sub-keys from dictionary
-                  temp = devices['installation'][key]                           
+                  temp = devices['installation'][key]
 
                   # Flatten wide to long
-                  temp_frame = pd.DataFrame(temp, index=[0])                     
+                  temp_frame = pd.DataFrame(temp, index=[0])
 
                   # Isolate username
-                  temp_frame['username'] = username                               
+                  temp_frame['username'] = username
 
                   # JavaScript derived login time
-                  temp_frame['login_time'] = login_time                           
-                  
+                  temp_frame['login_time'] = login_time
+
                   # Merge with parent DF on username
-                  master = master.merge(temp_frame, on='username')                
+                  master = master.merge(temp_frame, on='username')
 
             return master
 
@@ -453,7 +496,7 @@ class EMA_Parser:
       #####
 
 
-      def parse_responses(self, KEY: str, SUBSET: dict, LOG, 
+      def parse_responses(self, KEY: str, SUBSET: dict, LOG,
                           OUTPUT_DIR: os.path, KICKOUT: bool) -> pd.DataFrame:
             """
             * KEY: Key from the master data dictionary
@@ -464,14 +507,14 @@ class EMA_Parser:
             """
 
             # Isolate username
-            username = KEY.split('-')[0]                                            
+            username = KEY.split('-')[0]
 
             try:
                   # Create answers DataFrame
                   answers = self.derive_answers(
-                        SUBSET=SUBSET, 
-                        LOG=LOG, 
-                        USER=username)  
+                        SUBSET=SUBSET,
+                        LOG=LOG,
+                        USER=username)
 
             except Exception as e:
                   LOG.write(f"\nCaught @ {username} + derive_answers: {e}\n\n")
@@ -480,7 +523,8 @@ class EMA_Parser:
 
             try:
                   # Isolate race responses
-                  answers = self.parse_race(answers)    
+                  answers = self.parse_race(answers)
+                  ansers = self.remove_brackets(answers)
 
             except Exception as e:
                   LOG.write(f"\nCaught @ {username} + parse_race: {e}\n\n")
@@ -489,8 +533,8 @@ class EMA_Parser:
 
             try:
                   # Isolate nomination responses
-                  answers = self.parse_nominations(answers)                                
-            
+                  answers = self.parse_nominations(answers)
+
             except Exception as e:
                   LOG.write(f"\nCaught @ {username} + parse_nominations: {e}\n\n")
 
@@ -499,7 +543,7 @@ class EMA_Parser:
             try:
                   # Create pings DataFrame
                   pings = self.derive_pings(
-                        SUBSET=SUBSET, 
+                        SUBSET=SUBSET,
                         KEY=KEY)
 
             except Exception as e:
@@ -517,7 +561,7 @@ class EMA_Parser:
 
 
 
-      def output(self, KEY: str, PINGS: pd.DataFrame, 
+      def output(self, KEY: str, PINGS: pd.DataFrame,
                 ANSWERS: pd.DataFrame, OUTPUT_DIR: os.path, KICKOUT: bool):
             """
             Merges pings and answers dataframes
@@ -583,7 +627,7 @@ class EMA_Parser:
 
                         # Empty list to append subject data into
                         keepers = []
-                        
+
                         # Empty dictionary to append sparse data into
                         parent_errors = {}
 
@@ -604,10 +648,10 @@ class EMA_Parser:
                               try:
                                     # Run parse_responses function to isolate participant data
                                     parsed_data = self.parse_responses(
-                                          key, 
-                                          subset, 
-                                          log, 
-                                          subject_output_directory, 
+                                          key,
+                                          subset,
+                                          log,
+                                          subject_output_directory,
                                           True)
 
                               except Exception as e:
@@ -683,7 +727,7 @@ class EMA_Parser:
 
             with tarfile.open(tarfile_name, "w:gz") as tar:
                   tar.add(
-                        self.aggregate_output, 
+                        self.aggregate_output,
                         arcname=f"SCP_EMA_Responses_{filename}"
                   )
 
